@@ -1,0 +1,461 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== MULTI-TENANT SAAS ====================
+
+model Organization {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  address       String?
+  phone         String?
+  email         String?
+  logo          String?
+  subscription  String   @default("trial") // trial, basic, professional, enterprise
+  status        String   @default("active") // active, suspended, cancelled
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users         User[]
+  vehicles      Vehicle[]
+  drivers       Driver[]
+  geofences     Geofence[]
+  alerts        Alert[]
+  incidents     Incident[]
+  routes        Route[]
+}
+
+// ==================== USER MANAGEMENT ====================
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  password        String
+  firstName       String
+  lastName        String
+  phone           String?
+  avatar          String?
+  role            String   // saas_admin, saas_subscriber_manager, saas_support, saas_developer, company_admin, fleet_manager, driver, company_support
+  status          String   @default("active") // active, inactive, suspended
+  emailVerified   DateTime?
+  lastLogin       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+
+  driver          Driver?
+  sessions        Session[]
+  auditLogs       AuditLog[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==================== DRIVER MANAGEMENT ====================
+
+model Driver {
+  id                String   @id @default(cuid())
+  licenseNumber     String
+  licenseState      String
+  licenseExpiry     DateTime
+  dotMedicalExpiry  DateTime?
+  status            String   @default("available") // available, driving, off_duty, sleeper_berth
+  safetyScore       Float    @default(100)
+  totalMiles        Float    @default(0)
+  totalTrips        Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+
+  currentVehicleId  String?  @unique
+  currentVehicle    Vehicle? @relation("CurrentDriver", fields: [currentVehicleId], references: [id])
+
+  eldLogs           ELDLog[]
+  trips             Trip[]
+  incidents         Incident[]
+  safetyEvents      SafetyEvent[]
+  assignments       VehicleAssignment[]
+}
+
+// ==================== VEHICLE MANAGEMENT ====================
+
+model Vehicle {
+  id                String   @id @default(cuid())
+  vin               String   @unique
+  licensePlate      String
+  make              String
+  model             String
+  year              Int
+  type              String   // truck, van, car, trailer
+  fuelType          String   // diesel, gasoline, electric, hybrid
+  status            String   @default("inactive") // active, inactive, maintenance, out_of_service
+  odometer          Float    @default(0)
+  engineHours       Float    @default(0)
+  lastServiceDate   DateTime?
+  nextServiceDue    DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+
+  currentDriver     Driver?  @relation("CurrentDriver")
+
+  iotDevice         IOTDevice?
+  locations         VehicleLocation[]
+  telemetry         VehicleTelemetry[]
+  diagnostics       VehicleDiagnostic[]
+  maintenanceRecords MaintenanceRecord[]
+  fuelRecords       FuelRecord[]
+  trips             Trip[]
+  incidents         Incident[]
+  videos            Video[]
+  assignments       VehicleAssignment[]
+}
+
+model VehicleAssignment {
+  id          String   @id @default(cuid())
+  startDate   DateTime
+  endDate     DateTime?
+  status      String   @default("active") // active, completed, cancelled
+  createdAt   DateTime @default(now())
+
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  driverId    String
+  driver      Driver   @relation(fields: [driverId], references: [id])
+}
+
+// ==================== IOT DEVICE ====================
+
+model IOTDevice {
+  id            String   @id @default(cuid())
+  serialNumber  String   @unique
+  type          String   // gps_tracker, eld, dashcam, dsm, adas
+  firmware      String?
+  status        String   @default("offline") // online, offline, error
+  lastPing      DateTime?
+  config        String?  // JSON config
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  vehicleId     String   @unique
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+}
+
+// ==================== GPS & TELEMETRY ====================
+
+model VehicleLocation {
+  id          String   @id @default(cuid())
+  latitude    Float
+  longitude   Float
+  altitude    Float?
+  heading     Float?
+  speed       Float?
+  accuracy    Float?
+  timestamp   DateTime @default(now())
+
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId, timestamp])
+}
+
+model VehicleTelemetry {
+  id              String   @id @default(cuid())
+  engineRpm       Float?
+  fuelLevel       Float?
+  coolantTemp     Float?
+  oilPressure     Float?
+  batteryVoltage  Float?
+  throttlePosition Float?
+  engineLoad      Float?
+  intakeAirTemp   Float?
+  massAirflow     Float?
+  timestamp       DateTime @default(now())
+
+  vehicleId       String
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId, timestamp])
+}
+
+model VehicleDiagnostic {
+  id          String   @id @default(cuid())
+  code        String   // DTC code
+  description String
+  severity    String   // info, warning, critical
+  status      String   @default("active") // active, resolved, ignored
+  detectedAt  DateTime @default(now())
+  resolvedAt  DateTime?
+
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+}
+
+// ==================== ELD COMPLIANCE ====================
+
+model ELDLog {
+  id            String   @id @default(cuid())
+  date          DateTime
+  status        String   // off_duty, sleeper_berth, driving, on_duty_not_driving
+  startTime     DateTime
+  endTime       DateTime?
+  duration      Int?     // in minutes
+  location      String?
+  notes         String?
+  certified     Boolean  @default(false)
+  edited        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  driverId      String
+  driver        Driver   @relation(fields: [driverId], references: [id])
+
+  @@index([driverId, date])
+}
+
+// ==================== TRIPS & ROUTES ====================
+
+model Route {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  origin          String
+  originLat       Float
+  originLng       Float
+  destination     String
+  destinationLat  Float
+  destinationLng  Float
+  waypoints       String?  // JSON array of waypoints
+  distance        Float?   // in miles
+  estimatedTime   Int?     // in minutes
+  status          String   @default("active") // active, inactive
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+
+  trips           Trip[]
+}
+
+model Trip {
+  id              String   @id @default(cuid())
+  startTime       DateTime
+  endTime         DateTime?
+  startLocation   String
+  startLat        Float
+  startLng        Float
+  endLocation     String?
+  endLat          Float?
+  endLng          Float?
+  distance        Float?   // actual distance in miles
+  duration        Int?     // in minutes
+  fuelUsed        Float?   // in gallons
+  avgSpeed        Float?
+  maxSpeed        Float?
+  idleTime        Int?     // in minutes
+  status          String   @default("in_progress") // scheduled, in_progress, completed, cancelled
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vehicleId       String
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  driverId        String
+  driver          Driver   @relation(fields: [driverId], references: [id])
+
+  routeId         String?
+  route           Route?   @relation(fields: [routeId], references: [id])
+}
+
+// ==================== GEOFENCING ====================
+
+model Geofence {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  type          String   // circle, polygon
+  coordinates   String   // JSON: {lat, lng, radius} for circle or array of points for polygon
+  color         String   @default("#3B82F6")
+  alertOnEntry  Boolean  @default(true)
+  alertOnExit   Boolean  @default(true)
+  status        String   @default("active") // active, inactive
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  alerts         Alert[]
+}
+
+// ==================== SAFETY & INCIDENTS ====================
+
+model SafetyEvent {
+  id            String   @id @default(cuid())
+  type          String   // harsh_braking, harsh_acceleration, speeding, distraction, fatigue, lane_departure, collision_warning
+  severity      String   // low, medium, high, critical
+  latitude      Float?
+  longitude     Float?
+  speed         Float?
+  data          String?  // JSON additional data
+  timestamp     DateTime @default(now())
+
+  driverId      String
+  driver        Driver   @relation(fields: [driverId], references: [id])
+
+  videoId       String?
+  video         Video?   @relation(fields: [videoId], references: [id])
+
+  @@index([driverId, timestamp])
+}
+
+model Incident {
+  id            String   @id @default(cuid())
+  type          String   // accident, breakdown, theft, vandalism, traffic_violation
+  severity      String   // minor, moderate, major, critical
+  description   String
+  latitude      Float
+  longitude     Float
+  location      String?
+  status        String   @default("open") // open, investigating, resolved, closed
+  reportedAt    DateTime @default(now())
+  resolvedAt    DateTime?
+  resolution    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  vehicleId     String?
+  vehicle       Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  driverId      String?
+  driver        Driver?  @relation(fields: [driverId], references: [id])
+
+  videos        Video[]
+}
+
+// ==================== VIDEO MANAGEMENT ====================
+
+model Video {
+  id            String   @id @default(cuid())
+  filename      String
+  url           String
+  thumbnailUrl  String?
+  duration      Int?     // in seconds
+  size          Int?     // in bytes
+  type          String   // dashcam, cabin, incident, event
+  startTime     DateTime
+  endTime       DateTime?
+  status        String   @default("processing") // processing, ready, error, deleted
+  metadata      String?  // JSON metadata
+  createdAt     DateTime @default(now())
+
+  vehicleId     String
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  incidentId    String?
+  incident      Incident? @relation(fields: [incidentId], references: [id])
+
+  safetyEvents  SafetyEvent[]
+}
+
+// ==================== MAINTENANCE ====================
+
+model MaintenanceRecord {
+  id            String   @id @default(cuid())
+  type          String   // scheduled, unscheduled, repair, inspection
+  description   String
+  odometer      Float
+  cost          Float?
+  vendor        String?
+  parts         String?  // JSON array of parts
+  laborHours    Float?
+  status        String   @default("completed") // scheduled, in_progress, completed, cancelled
+  scheduledDate DateTime?
+  completedDate DateTime?
+  nextDueDate   DateTime?
+  nextDueOdometer Float?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  vehicleId     String
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+}
+
+model FuelRecord {
+  id            String   @id @default(cuid())
+  date          DateTime
+  gallons       Float
+  pricePerGallon Float
+  totalCost     Float
+  odometer      Float
+  fuelType      String
+  location      String?
+  fullTank      Boolean  @default(true)
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  vehicleId     String
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+}
+
+// ==================== ALERTS & NOTIFICATIONS ====================
+
+model Alert {
+  id            String   @id @default(cuid())
+  type          String   // geofence, speeding, maintenance, eld_violation, safety, system
+  severity      String   // info, warning, critical
+  title         String
+  message       String
+  data          String?  // JSON additional data
+  read          Boolean  @default(false)
+  acknowledged  Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  geofenceId    String?
+  geofence      Geofence? @relation(fields: [geofenceId], references: [id])
+}
+
+// ==================== AUDIT LOG ====================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String   // create, update, delete, login, logout
+  entity      String   // user, vehicle, driver, etc.
+  entityId    String?
+  details     String?  // JSON details
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+}
