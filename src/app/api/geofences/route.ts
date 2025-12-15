@@ -5,12 +5,9 @@ import { z } from "zod";
 
 const geofenceSchema = z.object({
   name: z.string().min(1).max(100),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   type: z.enum(["circle", "polygon"]),
-  coordinates: z.union([
-    z.object({ lat: z.number(), lng: z.number(), radius: z.number() }),
-    z.array(z.object({ lat: z.number(), lng: z.number() })),
-  ]),
+  coordinates: z.string(), // JSON string of coordinates
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   alertOnEntry: z.boolean().optional(),
   alertOnExit: z.boolean().optional(),
@@ -74,9 +71,9 @@ export async function POST(request: Request) {
     const geofence = await prisma.geofence.create({
       data: {
         name: validatedData.name,
-        description: validatedData.description,
+        description: validatedData.description || null,
         type: validatedData.type,
-        coordinates: JSON.stringify(validatedData.coordinates),
+        coordinates: validatedData.coordinates,
         color: validatedData.color || "#3B82F6",
         alertOnEntry: validatedData.alertOnEntry ?? true,
         alertOnExit: validatedData.alertOnExit ?? true,

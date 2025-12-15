@@ -23,6 +23,7 @@ import {
   Pentagon,
   RefreshCw,
 } from "lucide-react";
+import { AddGeofenceModal } from "./AddGeofenceModal";
 
 const GeofenceMap = dynamic(() => import("./GeofenceMap"), {
   ssr: false,
@@ -268,6 +269,12 @@ export function GeofenceManager({ geofences }: GeofenceManagerProps) {
           )}
         </div>
       </div>
+
+      {/* Add Geofence Modal */}
+      <AddGeofenceModal
+        isOpen={isCreating}
+        onClose={() => setIsCreating(false)}
+      />
     </div>
   );
 }

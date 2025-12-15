@@ -29,6 +29,8 @@ import {
   Shield,
   Calendar,
 } from "lucide-react";
+import { AddUserModal } from "./AddUserModal";
+import { AddOrganizationModal } from "./AddOrganizationModal";
 
 interface Organization {
   id: string;
@@ -80,6 +82,8 @@ export function AdminDashboard({
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState(isSaaSAdmin ? "organizations" : "users");
   const [search, setSearch] = useState("");
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showOrgModal, setShowOrgModal] = useState(false);
 
   const tabs = isSaaSAdmin
     ? [
@@ -193,7 +197,7 @@ export function AdminDashboard({
                 className="pl-10"
               />
             </div>
-            <Button>
+            <Button onClick={() => activeTab === "organizations" ? setShowOrgModal(true) : setShowUserModal(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add {activeTab === "organizations" ? "Organization" : "User"}
             </Button>
@@ -356,6 +360,22 @@ export function AdminDashboard({
             </TableBody>
           </Table>
         </Card>
+      )}
+
+      {/* Add User Modal */}
+      <AddUserModal
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        isSaaSAdmin={isSaaSAdmin}
+        organizations={organizations.map((org) => ({ id: org.id, name: org.name }))}
+      />
+
+      {/* Add Organization Modal */}
+      {isSaaSAdmin && (
+        <AddOrganizationModal
+          isOpen={showOrgModal}
+          onClose={() => setShowOrgModal(false)}
+        />
       )}
     </div>
   );

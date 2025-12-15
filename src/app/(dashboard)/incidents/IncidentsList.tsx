@@ -26,6 +26,7 @@ import {
   FileText,
   Filter,
 } from "lucide-react";
+import { ReportIncidentModal } from "./ReportIncidentModal";
 
 interface Incident {
   id: string;
@@ -67,6 +68,7 @@ export function IncidentsList({ incidents, userRole }: IncidentsListProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Calculate stats
   const openIncidents = incidents.filter((i) => i.status === "open").length;
@@ -192,7 +194,7 @@ export function IncidentsList({ incidents, userRole }: IncidentsListProps) {
                 </option>
               ))}
             </select>
-            <Button>
+            <Button onClick={() => setShowReportModal(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Report Incident
             </Button>
@@ -442,6 +444,12 @@ export function IncidentsList({ incidents, userRole }: IncidentsListProps) {
           )}
         </div>
       </div>
+
+      {/* Report Incident Modal */}
+      <ReportIncidentModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+      />
     </div>
   );
 }

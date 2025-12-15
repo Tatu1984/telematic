@@ -9,9 +9,9 @@ const incidentSchema = z.object({
   description: z.string().min(1),
   latitude: z.number(),
   longitude: z.number(),
-  location: z.string().optional(),
-  vehicleId: z.string().optional(),
-  driverId: z.string().optional(),
+  location: z.string().nullable().optional(),
+  vehicleId: z.string().nullable().optional(),
+  driverId: z.string().nullable().optional(),
 });
 
 export async function GET(request: Request) {
@@ -98,7 +98,14 @@ export async function POST(request: Request) {
 
     const incident = await prisma.incident.create({
       data: {
-        ...validatedData,
+        type: validatedData.type,
+        severity: validatedData.severity,
+        description: validatedData.description,
+        latitude: validatedData.latitude,
+        longitude: validatedData.longitude,
+        location: validatedData.location || null,
+        vehicleId: validatedData.vehicleId || null,
+        driverId: validatedData.driverId || null,
         organizationId: session.user.organizationId,
         status: "open",
       },

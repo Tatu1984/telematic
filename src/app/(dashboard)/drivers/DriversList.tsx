@@ -14,6 +14,7 @@ import {
   TableCell,
 } from "@/components/ui";
 import { Plus, Search, User, MoreVertical, Truck, Shield, AlertTriangle } from "lucide-react";
+import { AddDriverModal } from "./AddDriverModal";
 
 interface Driver {
   id: string;
@@ -50,6 +51,7 @@ interface DriversListProps {
 export function DriversList({ drivers, userRole }: DriversListProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const filteredDrivers = drivers.filter((driver) => {
     const matchesSearch =
@@ -118,7 +120,7 @@ export function DriversList({ drivers, userRole }: DriversListProps) {
           </div>
 
           {canAddDriver && (
-            <Button>
+            <Button onClick={() => setShowAddModal(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add Driver
             </Button>
@@ -242,6 +244,12 @@ export function DriversList({ drivers, userRole }: DriversListProps) {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Add Driver Modal */}
+      <AddDriverModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+      />
     </div>
   );
 }
