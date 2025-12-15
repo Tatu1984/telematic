@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui";
+import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, toast } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,12 +26,15 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError("Invalid email or password");
+        toast.error("Invalid email or password");
       } else {
+        toast.success("Login successful! Redirecting to dashboard...");
         router.push("/dashboard");
         router.refresh();
       }
     } catch {
       setError("An error occurred. Please try again.");
+      toast.error("An error occurred. Please try again.");
     } finally {
       setLoading(false);
     }

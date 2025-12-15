@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Select, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
+import { Button, Input, Select, Card, CardHeader, CardTitle, CardContent, toast } from "@/components/ui";
 import { X } from "lucide-react";
 
 interface AddVehicleModalProps {
@@ -45,6 +45,7 @@ export function AddVehicleModal({ isOpen, onClose }: AddVehicleModalProps) {
         throw new Error(data.error || "Failed to add vehicle");
       }
 
+      toast.success("Vehicle added successfully!");
       router.refresh();
       onClose();
       setFormData({
@@ -57,7 +58,9 @@ export function AddVehicleModal({ isOpen, onClose }: AddVehicleModalProps) {
         fuelType: "diesel",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
