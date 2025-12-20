@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { createRequestLogger, logError, logPerformance } from "@/lib/logger";
+import { withRateLimit } from "@/lib/rateLimit";
+import { v4 as uuidv4 } from "uuid";
 
 const vehicleSchema = z.object({
   vin: z.string().length(17),
@@ -13,12 +16,31 @@ const vehicleSchema = z.object({
   fuelType: z.enum(["diesel", "gasoline", "electric", "hybrid"]),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
+  const startTime = Date.now();
+  const requestId = uuidv4();
+  const log = createRequestLogger({
+    requestId,
+    method: "GET",
+    path: "/api/vehicles",
+  });
+
   try {
+    // Check rate limit
+    const rateLimitCheck = withRateLimit("api");
+    const rateLimitResponse = await rateLimitCheck(request);
+    if (rateLimitResponse) {
+      log.warn("Rate limit exceeded");
+      return rateLimitResponse;
+    }
+
     const session = await auth();
     if (!session?.user) {
+      log.warn("Unauthorized access attempt");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    log.info({ userId: session.user.id }, "Fetching vehicles");
 
     const where = session.user.organizationId
       ? { organizationId: session.user.organizationId }
@@ -35,9 +57,12 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
+    logPerformance(log, "fetch_vehicles", startTime);
+    log.info({ count: vehicles.length }, "Vehicles fetched successfully");
+
     return NextResponse.json(vehicles);
   } catch (error) {
-    console.error("Error fetching vehicles:", error);
+    logError(log, error, { operation: "fetch_vehicles" });
     return NextResponse.json(
       { error: "Failed to fetch vehicles" },
       { status: 500 }
@@ -46,15 +71,35 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const startTime = Date.now();
+  const requestId = uuidv4();
+  const log = createRequestLogger({
+    requestId,
+    method: "POST",
+    path: "/api/vehicles",
+  });
+
   try {
+    // Check rate limit
+    const rateLimitCheck = withRateLimit("api");
+    const rateLimitResponse = await rateLimitCheck(request);
+    if (rateLimitResponse) {
+      log.warn("Rate limit exceeded");
+      return rateLimitResponse;
+    }
+
     const session = await auth();
     if (!session?.user) {
+      log.warn("Unauthorized access attempt");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    log.info({ userId: session.user.id }, "Creating vehicle");
 
     // Check permissions
     const allowedRoles = ["saas_admin", "company_admin", "fleet_manager"];
     if (!allowedRoles.includes(session.user.role)) {
+      log.warn({ role: session.user.role }, "Forbidden - insufficient permissions");
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -67,6 +112,7 @@ export async function POST(request: Request) {
     });
 
     if (existingVehicle) {
+      log.warn({ vin: validatedData.vin }, "Duplicate VIN");
       return NextResponse.json(
         { error: "Vehicle with this VIN already exists" },
         { status: 400 }
@@ -75,6 +121,7 @@ export async function POST(request: Request) {
 
     // For SaaS admin without org, we need to handle differently
     if (!session.user.organizationId) {
+      log.warn("No organization ID for vehicle creation");
       return NextResponse.json(
         { error: "Organization required to add vehicles" },
         { status: 400 }
@@ -88,15 +135,19 @@ export async function POST(request: Request) {
       },
     });
 
+    logPerformance(log, "create_vehicle", startTime);
+    log.info({ vehicleId: vehicle.id }, "Vehicle created successfully");
+
     return NextResponse.json(vehicle, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      log.warn({ issues: error.issues }, "Validation error");
       return NextResponse.json(
         { error: "Invalid data", details: error.issues },
         { status: 400 }
       );
     }
-    console.error("Error creating vehicle:", error);
+    logError(log, error, { operation: "create_vehicle" });
     return NextResponse.json(
       { error: "Failed to create vehicle" },
       { status: 500 }

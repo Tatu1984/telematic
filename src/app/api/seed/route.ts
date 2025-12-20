@@ -1,17 +1,47 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hash } from "bcryptjs";
+import { auth } from "@/lib/auth";
+import { createLogger, logError } from "@/lib/logger";
 
-export async function POST() {
+const log = createLogger("seed");
+
+export async function POST(request: Request) {
   try {
+    // In production, require admin authentication
+    if (process.env.NODE_ENV === "production") {
+      const session = await auth();
+      if (!session?.user || session.user.role !== "saas_admin") {
+        log.warn("Unauthorized seed attempt in production");
+        return NextResponse.json(
+          { error: "Unauthorized - Admin access required in production" },
+          { status: 401 }
+        );
+      }
+    }
+
+    // Check for seed secret in headers for automated deployments
+    const seedSecret = request.headers.get("x-seed-secret");
+    const expectedSecret = process.env.SEED_SECRET;
+    if (expectedSecret && seedSecret !== expectedSecret) {
+      log.warn("Invalid seed secret provided");
+      return NextResponse.json(
+        { error: "Invalid seed secret" },
+        { status: 401 }
+      );
+    }
+
     // Check if data already exists
     const existingOrg = await prisma.organization.findFirst();
     if (existingOrg) {
+      log.info("Database already seeded, skipping");
       return NextResponse.json(
         { message: "Database already seeded" },
         { status: 200 }
       );
     }
+
+    log.info("Starting database seed");
 
     // Create organization
     const organization = await prisma.organization.create({
@@ -347,6 +377,8 @@ export async function POST() {
       });
     }
 
+    log.info("Database seeded successfully");
+
     return NextResponse.json({
       success: true,
       message: "Database seeded successfully",
@@ -358,9 +390,9 @@ export async function POST() {
       },
     });
   } catch (error) {
-    console.error("Error seeding database:", error);
+    logError(log, error, { operation: "seed_database" });
     return NextResponse.json(
-      { error: "Failed to seed database", details: String(error) },
+      { error: "Failed to seed database" },
       { status: 500 }
     );
   }

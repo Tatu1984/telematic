@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { createLogger, logError } from "@/lib/logger";
+import { withRateLimit } from "@/lib/rateLimit";
+
+const log = createLogger("analytics");
 
 export async function GET(request: Request) {
   try {
+    // Rate limit check (analytics is expensive)
+    const rateLimitResponse = await withRateLimit("api")(request);
+    if (rateLimitResponse) return rateLimitResponse;
+
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -11,7 +19,9 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "30"; // days
-    const days = parseInt(period);
+    const days = Math.min(Math.max(parseInt(period) || 30, 1), 365); // Clamp between 1-365 days
+
+    log.info({ userId: session.user.id, period: days }, "Fetching analytics");
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
@@ -123,6 +133,8 @@ export async function GET(request: Request) {
       }),
     ]);
 
+    log.info({ vehicleCount, tripCount: tripStats._count }, "Analytics fetched");
+
     return NextResponse.json({
       tripStats,
       safetyEvents,
@@ -133,7 +145,7 @@ export async function GET(request: Request) {
       tripTrends,
     });
   } catch (error) {
-    console.error("Error fetching analytics:", error);
+    logError(log, error, { operation: "fetch_analytics" });
     return NextResponse.json(
       { error: "Failed to fetch analytics" },
       { status: 500 }

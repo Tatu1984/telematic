@@ -1,13 +1,23 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { createLogger, logError } from "@/lib/logger";
+import { withRateLimit } from "@/lib/rateLimit";
 
-export async function GET() {
+const log = createLogger("tracking");
+
+export async function GET(request: Request) {
   try {
+    // Rate limit check
+    const rateLimitResponse = await withRateLimit("api")(request);
+    if (rateLimitResponse) return rateLimitResponse;
+
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    log.info({ userId: session.user.id }, "Fetching tracking data");
 
     const where = session.user.organizationId
       ? { organizationId: session.user.organizationId, status: "active" }
@@ -84,15 +94,24 @@ export async function GET() {
         };
       });
 
-    const parsedGeofences = geofences.map((g) => ({
-      id: g.id,
-      name: g.name,
-      type: g.type,
-      coordinates: JSON.parse(g.coordinates),
-      color: g.color,
-      alertOnEntry: g.alertOnEntry,
-      alertOnExit: g.alertOnExit,
-    }));
+    const parsedGeofences = geofences.map((g) => {
+      try {
+        return {
+          id: g.id,
+          name: g.name,
+          type: g.type,
+          coordinates: JSON.parse(g.coordinates),
+          color: g.color,
+          alertOnEntry: g.alertOnEntry,
+          alertOnExit: g.alertOnExit,
+        };
+      } catch (parseError) {
+        log.warn({ geofenceId: g.id }, "Failed to parse geofence coordinates");
+        return null;
+      }
+    }).filter(Boolean);
+
+    log.info({ vehicleCount: trackingData.length, geofenceCount: parsedGeofences.length }, "Tracking data fetched");
 
     return NextResponse.json({
       vehicles: trackingData,
@@ -100,7 +119,7 @@ export async function GET() {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Error fetching tracking data:", error);
+    logError(log, error, { operation: "fetch_tracking" });
     return NextResponse.json(
       { error: "Failed to fetch tracking data" },
       { status: 500 }
