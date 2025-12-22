@@ -103,31 +103,29 @@ export default function LoginPage() {
             </Button>
           </form>
 
-{process.env.NODE_ENV === "development" && (
-            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 text-center">
-                Demo Credentials
-              </p>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-500 dark:text-gray-400">SaaS Admin:</span>
-                  <span className="font-mono text-gray-700 dark:text-gray-300">admin@fleettrack.com / admin123</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-500 dark:text-gray-400">Company Admin:</span>
-                  <span className="font-mono text-gray-700 dark:text-gray-300">admin@acmetrucking.com / company123</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-500 dark:text-gray-400">Fleet Manager:</span>
-                  <span className="font-mono text-gray-700 dark:text-gray-300">fleet@acmetrucking.com / fleet123</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-gray-500 dark:text-gray-400">Driver:</span>
-                  <span className="font-mono text-gray-700 dark:text-gray-300">john.smith@acmetrucking.com / driver123</span>
-                </div>
+<div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-3 text-center">
+              Demo Credentials
+            </p>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-gray-700">
+                <span className="text-gray-500 dark:text-gray-400">SaaS Admin:</span>
+                <span className="font-mono text-gray-700 dark:text-gray-300">admin@fleettrack.com / admin123</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-gray-700">
+                <span className="text-gray-500 dark:text-gray-400">Company Admin:</span>
+                <span className="font-mono text-gray-700 dark:text-gray-300">admin@acmetrucking.com / company123</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-gray-700">
+                <span className="text-gray-500 dark:text-gray-400">Fleet Manager:</span>
+                <span className="font-mono text-gray-700 dark:text-gray-300">fleet@acmetrucking.com / fleet123</span>
+              </div>
+              <div className="flex justify-between items-center py-1">
+                <span className="text-gray-500 dark:text-gray-400">Driver:</span>
+                <span className="font-mono text-gray-700 dark:text-gray-300">john.smith@acmetrucking.com / driver123</span>
               </div>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
     </div>
