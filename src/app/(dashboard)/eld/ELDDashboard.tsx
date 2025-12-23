@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardHeader,
@@ -9,6 +10,7 @@ import {
   Badge,
   Button,
   Select,
+  toast,
 } from "@/components/ui";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import {
@@ -69,10 +71,42 @@ const HOS_RULES = {
 };
 
 export function ELDDashboard({ drivers, todayLogs, userRole }: ELDDashboardProps) {
+  const router = useRouter();
   const [selectedDriver, setSelectedDriver] = useState<string>("all");
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+
+  const handleUpdateDriverStatus = async (driverId: string, newStatus: string) => {
+    setUpdatingStatus(driverId);
+    try {
+      const response = await fetch(`/api/eld/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driverId, status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update status");
+      }
+
+      toast.success(`Status updated to ${newStatus.replace(/_/g, " ")}!`);
+      router.refresh();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const handleViewFullLog = (driverId: string) => {
+    toast.info("Full log view coming soon");
+    // Future: Navigate to detailed ELD log view
+    // router.push(`/eld/driver/${driverId}?date=${selectedDate}`);
+  };
 
   // Calculate HOS for each driver
   const calculateHOS = (logs: ELDLog[]) => {
@@ -369,13 +403,26 @@ export function ELDDashboard({ drivers, todayLogs, userRole }: ELDDashboardProps
 
                 {/* Actions */}
                 <div className="flex gap-2 mt-4 pt-4 border-t dark:border-gray-700">
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleViewFullLog(driver.id)}
+                  >
                     View Full Log
                   </Button>
                   {userRole === "driver" && (
-                    <Button size="sm" className="flex-1">
-                      Update Status
-                    </Button>
+                    <select
+                      value={driver.status}
+                      onChange={(e) => handleUpdateDriverStatus(driver.id, e.target.value)}
+                      disabled={updatingStatus === driver.id}
+                      className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white"
+                    >
+                      <option value="off_duty">Off Duty</option>
+                      <option value="sleeper_berth">Sleeper Berth</option>
+                      <option value="driving">Driving</option>
+                      <option value="on_duty_not_driving">On Duty (Not Driving)</option>
+                    </select>
                   )}
                 </div>
               </CardContent>

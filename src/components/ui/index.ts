@@ -6,3 +6,4 @@ export { Select } from "./Select";
 export { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "./Table";
 export { ToastContainer, toast } from "./Toast";
 export { Skeleton, CardSkeleton, TableSkeleton, ChartSkeleton, MapSkeleton, StatsGridSkeleton } from "./Skeleton";
+export { DropdownMenu, ConfirmDialog } from "./DropdownMenu";

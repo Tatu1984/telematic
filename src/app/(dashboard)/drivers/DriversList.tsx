@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   Button,
@@ -12,9 +13,13 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  DropdownMenu,
+  ConfirmDialog,
+  toast,
 } from "@/components/ui";
-import { Plus, Search, User, MoreVertical, Truck, Shield, AlertTriangle } from "lucide-react";
+import { Plus, Search, User, Truck, Shield, AlertTriangle, Edit, Trash2, Eye } from "lucide-react";
 import { AddDriverModal } from "./AddDriverModal";
+import { EditDriverModal } from "./EditDriverModal";
 
 interface Driver {
   id: string;
@@ -49,9 +54,41 @@ interface DriversListProps {
 }
 
 export function DriversList({ drivers, userRole }: DriversListProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  const [deletingDriver, setDeletingDriver] = useState<Driver | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleDeleteDriver = async () => {
+    if (!deletingDriver) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`/api/drivers/${deletingDriver.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete driver");
+      }
+
+      toast.success("Driver deleted successfully!");
+      router.refresh();
+      setDeletingDriver(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const canEditDriver = ["saas_admin", "company_admin", "fleet_manager"].includes(userRole);
+  const canDeleteDriver = ["saas_admin", "company_admin"].includes(userRole);
 
   const filteredDrivers = drivers.filter((driver) => {
     const matchesSearch =
@@ -234,9 +271,34 @@ export function DriversList({ drivers, userRole }: DriversListProps) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                      <MoreVertical className="w-4 h-4 text-gray-500" />
-                    </button>
+                    <DropdownMenu
+                      items={[
+                        {
+                          label: "View Details",
+                          icon: <Eye className="w-4 h-4" />,
+                          onClick: () => setEditingDriver(driver),
+                        },
+                        ...(canEditDriver
+                          ? [
+                              {
+                                label: "Edit Driver",
+                                icon: <Edit className="w-4 h-4" />,
+                                onClick: () => setEditingDriver(driver),
+                              },
+                            ]
+                          : []),
+                        ...(canDeleteDriver
+                          ? [
+                              {
+                                label: "Delete Driver",
+                                icon: <Trash2 className="w-4 h-4" />,
+                                onClick: () => setDeletingDriver(driver),
+                                variant: "danger" as const,
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))
@@ -249,6 +311,25 @@ export function DriversList({ drivers, userRole }: DriversListProps) {
       <AddDriverModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
+      />
+
+      {/* Edit Driver Modal */}
+      <EditDriverModal
+        isOpen={!!editingDriver}
+        onClose={() => setEditingDriver(null)}
+        driver={editingDriver}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deletingDriver}
+        onClose={() => setDeletingDriver(null)}
+        onConfirm={handleDeleteDriver}
+        title="Delete Driver"
+        message={`Are you sure you want to delete ${deletingDriver?.user.firstName} ${deletingDriver?.user.lastName}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={deleteLoading}
       />
     </div>
   );

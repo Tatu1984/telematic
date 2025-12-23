@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   Card,
@@ -10,6 +11,8 @@ import {
   Button,
   Badge,
   Input,
+  ConfirmDialog,
+  toast,
 } from "@/components/ui";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import {
@@ -58,8 +61,59 @@ interface GeofenceManagerProps {
 }
 
 export function GeofenceManager({ geofences }: GeofenceManagerProps) {
+  const router = useRouter();
   const [selectedGeofence, setSelectedGeofence] = useState<Geofence | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingGeofence, setDeletingGeofence] = useState<Geofence | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleDeleteGeofence = async () => {
+    if (!deletingGeofence) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`/api/geofences/${deletingGeofence.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete geofence");
+      }
+
+      toast.success("Geofence deleted successfully!");
+      router.refresh();
+      setDeletingGeofence(null);
+      setSelectedGeofence(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleToggleGeofenceStatus = async (geofence: Geofence) => {
+    try {
+      const newStatus = geofence.status === "active" ? "inactive" : "active";
+      const response = await fetch(`/api/geofences/${geofence.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update geofence");
+      }
+
+      toast.success(`Geofence ${newStatus === "active" ? "activated" : "deactivated"} successfully!`);
+      router.refresh();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    }
+  };
 
   const activeGeofences = geofences.filter((g) => g.status === "active").length;
   const totalAlerts = geofences.reduce((sum, g) => sum + g._count.alerts, 0);
@@ -213,11 +267,18 @@ export function GeofenceManager({ geofences }: GeofenceManagerProps) {
                   {selectedGeofence.name}
                 </CardTitle>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <Edit className="w-4 h-4 mr-1" />
-                    Edit
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleToggleGeofenceStatus(selectedGeofence)}
+                  >
+                    {selectedGeofence.status === "active" ? "Deactivate" : "Activate"}
                   </Button>
-                  <Button variant="danger" size="sm">
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setDeletingGeofence(selectedGeofence)}
+                  >
                     <Trash2 className="w-4 h-4 mr-1" />
                     Delete
                   </Button>
@@ -274,6 +335,18 @@ export function GeofenceManager({ geofences }: GeofenceManagerProps) {
       <AddGeofenceModal
         isOpen={isCreating}
         onClose={() => setIsCreating(false)}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deletingGeofence}
+        onClose={() => setDeletingGeofence(null)}
+        onConfirm={handleDeleteGeofence}
+        title="Delete Geofence"
+        message={`Are you sure you want to delete "${deletingGeofence?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={deleteLoading}
       />
     </div>
   );

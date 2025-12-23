@@ -138,7 +138,7 @@ export default async function DashboardPage() {
                 Recent Trips
               </CardTitle>
               <Link
-                href="/fleet"
+                href="/vehicles"
                 className="text-sm text-blue-600 hover:underline"
               >
                 View all

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   Button,
@@ -12,9 +13,13 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  DropdownMenu,
+  ConfirmDialog,
+  toast,
 } from "@/components/ui";
-import { Plus, Search, Truck, MoreVertical, MapPin, Wrench, AlertTriangle } from "lucide-react";
+import { Plus, Search, Truck, MapPin, AlertTriangle, Edit, Trash2, Eye } from "lucide-react";
 import { AddVehicleModal } from "./AddVehicleModal";
+import { EditVehicleModal } from "./EditVehicleModal";
 
 interface Vehicle {
   id: string;
@@ -49,9 +54,41 @@ interface VehiclesListProps {
 }
 
 export function VehiclesList({ vehicles, userRole }: VehiclesListProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [deletingVehicle, setDeletingVehicle] = useState<Vehicle | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleDeleteVehicle = async () => {
+    if (!deletingVehicle) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`/api/vehicles/${deletingVehicle.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete vehicle");
+      }
+
+      toast.success("Vehicle deleted successfully!");
+      router.refresh();
+      setDeletingVehicle(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const canEditVehicle = ["saas_admin", "company_admin", "fleet_manager"].includes(userRole);
+  const canDeleteVehicle = ["saas_admin", "company_admin"].includes(userRole);
 
   const filteredVehicles = vehicles.filter((vehicle) => {
     const matchesSearch =
@@ -220,9 +257,34 @@ export function VehiclesList({ vehicles, userRole }: VehiclesListProps) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                      <MoreVertical className="w-4 h-4 text-gray-500" />
-                    </button>
+                    <DropdownMenu
+                      items={[
+                        {
+                          label: "View Details",
+                          icon: <Eye className="w-4 h-4" />,
+                          onClick: () => setEditingVehicle(vehicle),
+                        },
+                        ...(canEditVehicle
+                          ? [
+                              {
+                                label: "Edit Vehicle",
+                                icon: <Edit className="w-4 h-4" />,
+                                onClick: () => setEditingVehicle(vehicle),
+                              },
+                            ]
+                          : []),
+                        ...(canDeleteVehicle
+                          ? [
+                              {
+                                label: "Delete Vehicle",
+                                icon: <Trash2 className="w-4 h-4" />,
+                                onClick: () => setDeletingVehicle(vehicle),
+                                variant: "danger" as const,
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))
@@ -235,6 +297,25 @@ export function VehiclesList({ vehicles, userRole }: VehiclesListProps) {
       <AddVehicleModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
+      />
+
+      {/* Edit Vehicle Modal */}
+      <EditVehicleModal
+        isOpen={!!editingVehicle}
+        onClose={() => setEditingVehicle(null)}
+        vehicle={editingVehicle}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deletingVehicle}
+        onClose={() => setDeletingVehicle(null)}
+        onConfirm={handleDeleteVehicle}
+        title="Delete Vehicle"
+        message={`Are you sure you want to delete ${deletingVehicle?.licensePlate}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={deleteLoading}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardHeader,
@@ -15,6 +16,9 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  DropdownMenu,
+  ConfirmDialog,
+  toast,
 } from "@/components/ui";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import {
@@ -24,10 +28,11 @@ import {
   UserCheck,
   Plus,
   Search,
-  MoreVertical,
-  Mail,
-  Shield,
-  Calendar,
+  Edit,
+  Trash2,
+  Eye,
+  UserX,
+  UserCog,
 } from "lucide-react";
 import { AddUserModal } from "./AddUserModal";
 import { AddOrganizationModal } from "./AddOrganizationModal";
@@ -80,10 +85,86 @@ export function AdminDashboard({
   systemStats,
   isSaaSAdmin,
 }: AdminDashboardProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(isSaaSAdmin ? "organizations" : "users");
   const [search, setSearch] = useState("");
   const [showUserModal, setShowUserModal] = useState(false);
   const [showOrgModal, setShowOrgModal] = useState(false);
+  const [deletingOrg, setDeletingOrg] = useState<Organization | null>(null);
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleDeleteOrg = async () => {
+    if (!deletingOrg) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`/api/admin/organizations/${deletingOrg.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete organization");
+      }
+
+      toast.success("Organization deleted successfully!");
+      router.refresh();
+      setDeletingOrg(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`/api/admin/users/${deletingUser.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete user");
+      }
+
+      toast.success("User deleted successfully!");
+      router.refresh();
+      setDeletingUser(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleToggleUserStatus = async (user: User) => {
+    try {
+      const newStatus = user.status === "active" ? "inactive" : "active";
+      const response = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update user");
+      }
+
+      toast.success(`User ${newStatus === "active" ? "activated" : "deactivated"} successfully!`);
+      router.refresh();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    }
+  };
 
   const tabs = isSaaSAdmin
     ? [
@@ -267,9 +348,26 @@ export function AdminDashboard({
                       {new Date(org.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
-                        <MoreVertical className="w-4 h-4 text-gray-500" />
-                      </button>
+                      <DropdownMenu
+                        items={[
+                          {
+                            label: "View Details",
+                            icon: <Eye className="w-4 h-4" />,
+                            onClick: () => toast.info(`Viewing ${org.name}`),
+                          },
+                          {
+                            label: "Edit Organization",
+                            icon: <Edit className="w-4 h-4" />,
+                            onClick: () => toast.info("Edit modal coming soon"),
+                          },
+                          {
+                            label: "Delete Organization",
+                            icon: <Trash2 className="w-4 h-4" />,
+                            onClick: () => setDeletingOrg(org),
+                            variant: "danger" as const,
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
@@ -350,9 +448,31 @@ export function AdminDashboard({
                       {new Date(user.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
-                        <MoreVertical className="w-4 h-4 text-gray-500" />
-                      </button>
+                      <DropdownMenu
+                        items={[
+                          {
+                            label: "View Profile",
+                            icon: <Eye className="w-4 h-4" />,
+                            onClick: () => toast.info(`Viewing ${user.firstName} ${user.lastName}`),
+                          },
+                          {
+                            label: "Edit User",
+                            icon: <UserCog className="w-4 h-4" />,
+                            onClick: () => toast.info("Edit modal coming soon"),
+                          },
+                          {
+                            label: user.status === "active" ? "Deactivate User" : "Activate User",
+                            icon: <UserX className="w-4 h-4" />,
+                            onClick: () => handleToggleUserStatus(user),
+                          },
+                          {
+                            label: "Delete User",
+                            icon: <Trash2 className="w-4 h-4" />,
+                            onClick: () => setDeletingUser(user),
+                            variant: "danger" as const,
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
@@ -377,6 +497,30 @@ export function AdminDashboard({
           onClose={() => setShowOrgModal(false)}
         />
       )}
+
+      {/* Delete Organization Confirmation */}
+      <ConfirmDialog
+        isOpen={!!deletingOrg}
+        onClose={() => setDeletingOrg(null)}
+        onConfirm={handleDeleteOrg}
+        title="Delete Organization"
+        message={`Are you sure you want to delete ${deletingOrg?.name}? This will remove all associated users, vehicles, and data. This action cannot be undone.`}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={deleteLoading}
+      />
+
+      {/* Delete User Confirmation */}
+      <ConfirmDialog
+        isOpen={!!deletingUser}
+        onClose={() => setDeletingUser(null)}
+        onConfirm={handleDeleteUser}
+        title="Delete User"
+        message={`Are you sure you want to delete ${deletingUser?.firstName} ${deletingUser?.lastName}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={deleteLoading}
+      />
     </div>
   );
 }

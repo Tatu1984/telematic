@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardHeader,
@@ -9,6 +10,8 @@ import {
   Button,
   Badge,
   Input,
+  Select,
+  toast,
 } from "@/components/ui";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import {
@@ -64,11 +67,47 @@ interface IncidentsListProps {
 }
 
 export function IncidentsList({ incidents, userRole }: IncidentsListProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const handleUpdateStatus = async (incidentId: string, newStatus: string) => {
+    setUpdatingStatus(true);
+    try {
+      const response = await fetch(`/api/incidents/${incidentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update incident");
+      }
+
+      toast.success(`Incident status updated to ${newStatus}!`);
+      router.refresh();
+
+      // Update selected incident locally
+      if (selectedIncident?.id === incidentId) {
+        setSelectedIncident({ ...selectedIncident, status: newStatus });
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleViewOnMap = (incident: Incident) => {
+    // Navigate to tracking page with coordinates
+    router.push(`/tracking?lat=${incident.latitude}&lng=${incident.longitude}`);
+  };
 
   // Calculate stats
   const openIncidents = incidents.filter((i) => i.status === "open").length;
@@ -422,12 +461,33 @@ export function IncidentsList({ incidents, userRole }: IncidentsListProps) {
                   </div>
                 )}
 
-                <div className="flex gap-2 pt-4 border-t dark:border-gray-700">
-                  <Button variant="outline" size="sm" className="flex-1">
+                <div className="pt-4 border-t dark:border-gray-700 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Update Status
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedIncident.status}
+                        onChange={(e) => handleUpdateStatus(selectedIncident.id, e.target.value)}
+                        disabled={updatingStatus}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white"
+                      >
+                        <option value="open">Open</option>
+                        <option value="investigating">Investigating</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleViewOnMap(selectedIncident)}
+                  >
+                    <MapPin className="w-4 h-4 mr-2" />
                     View on Map
-                  </Button>
-                  <Button size="sm" className="flex-1">
-                    Update Status
                   </Button>
                 </div>
               </CardContent>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardHeader,
@@ -9,16 +10,12 @@ import {
   CardFooter,
   Button,
   Input,
+  toast,
 } from "@/components/ui";
 import {
   User,
-  Mail,
-  Phone,
-  Lock,
   Bell,
   Globe,
-  Moon,
-  Sun,
   Shield,
 } from "lucide-react";
 import { SessionUser } from "@/types";
@@ -28,8 +25,85 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ user }: SettingsPageProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("profile");
   const [darkMode, setDarkMode] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Profile form state
+  const [profileData, setProfileData] = useState({
+    firstName: user.firstName,
+    lastName: user.lastName,
+    phone: "",
+  });
+
+  // Password form state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  const handleProfileSubmit = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/settings/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileData),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update profile");
+      }
+
+      toast.success("Profile updated successfully!");
+      router.refresh();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/settings/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update password");
+      }
+
+      toast.success("Password updated successfully!");
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
@@ -94,8 +168,16 @@ export function SettingsPage({ user }: SettingsPageProps) {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="First Name" defaultValue={user.firstName} />
-                <Input label="Last Name" defaultValue={user.lastName} />
+                <Input
+                  label="First Name"
+                  value={profileData.firstName}
+                  onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
+                />
+                <Input
+                  label="Last Name"
+                  value={profileData.lastName}
+                  onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
+                />
               </div>
 
               <Input
@@ -106,11 +188,21 @@ export function SettingsPage({ user }: SettingsPageProps) {
                 helperText="Contact admin to change email"
               />
 
-              <Input label="Phone Number" type="tel" placeholder="+1 (555) 000-0000" />
+              <Input
+                label="Phone Number"
+                type="tel"
+                placeholder="+1 (555) 000-0000"
+                value={profileData.phone}
+                onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+              />
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
-              <Button variant="outline">Cancel</Button>
-              <Button>Save Changes</Button>
+              <Button variant="outline" onClick={() => setProfileData({ firstName: user.firstName, lastName: user.lastName, phone: "" })}>
+                Cancel
+              </Button>
+              <Button onClick={handleProfileSubmit} loading={loading}>
+                Save Changes
+              </Button>
             </CardFooter>
           </Card>
         )}
@@ -122,12 +214,29 @@ export function SettingsPage({ user }: SettingsPageProps) {
                 <CardTitle>Change Password</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Input label="Current Password" type="password" />
-                <Input label="New Password" type="password" />
-                <Input label="Confirm New Password" type="password" />
+                <Input
+                  label="Current Password"
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                />
+                <Input
+                  label="New Password"
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                />
+                <Input
+                  label="Confirm New Password"
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                />
               </CardContent>
               <CardFooter className="flex justify-end">
-                <Button>Update Password</Button>
+                <Button onClick={handlePasswordSubmit} loading={loading}>
+                  Update Password
+                </Button>
               </CardFooter>
             </Card>
 
@@ -145,7 +254,9 @@ export function SettingsPage({ user }: SettingsPageProps) {
                       Receive a code via SMS to verify your identity
                     </p>
                   </div>
-                  <Button variant="outline">Enable</Button>
+                  <Button variant="outline" onClick={() => toast.info("2FA setup coming soon")}>
+                    Enable
+                  </Button>
                 </div>
               </CardContent>
             </Card>
