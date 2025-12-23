@@ -103,9 +103,7 @@ export function ELDDashboard({ drivers, todayLogs, userRole }: ELDDashboardProps
   };
 
   const handleViewFullLog = (driverId: string) => {
-    toast.info("Full log view coming soon");
-    // Future: Navigate to detailed ELD log view
-    // router.push(`/eld/driver/${driverId}?date=${selectedDate}`);
+    router.push(`/eld/driver/${driverId}?date=${selectedDate}`);
   };
 
   // Calculate HOS for each driver

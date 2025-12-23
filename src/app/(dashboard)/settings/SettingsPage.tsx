@@ -17,6 +17,7 @@ import {
   Bell,
   Globe,
   Shield,
+  Save,
 } from "lucide-react";
 import { SessionUser } from "@/types";
 
@@ -27,7 +28,6 @@ interface SettingsPageProps {
 export function SettingsPage({ user }: SettingsPageProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("profile");
-  const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Profile form state
@@ -43,6 +43,33 @@ export function SettingsPage({ user }: SettingsPageProps) {
     newPassword: "",
     confirmPassword: "",
   });
+
+  // Preferences state
+  const [preferences, setPreferences] = useState({
+    darkMode: false,
+    distanceUnit: "miles",
+    timezone: "America/Chicago",
+    dateFormat: "MM/DD/YYYY",
+    mapView: "street",
+    trafficLayer: true,
+    autoRefresh: true,
+  });
+
+  // Notification preferences state
+  const [notifications, setNotifications] = useState({
+    emailNotifications: true,
+    pushNotifications: true,
+    safetyAlerts: true,
+    eldViolations: true,
+    geofenceAlerts: true,
+    maintenanceReminders: false,
+    weeklyReports: false,
+  });
+
+  // 2FA state
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
+  const [twoFactorPhone, setTwoFactorPhone] = useState("");
 
   const handleProfileSubmit = async () => {
     setLoading(true);
@@ -97,6 +124,106 @@ export function SettingsPage({ user }: SettingsPageProps) {
 
       toast.success("Password updated successfully!");
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePreferencesSubmit = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/settings/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(preferences),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update preferences");
+      }
+
+      toast.success("Preferences saved successfully!");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNotificationsSubmit = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/settings/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(notifications),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update notifications");
+      }
+
+      toast.success("Notification preferences saved!");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTwoFactorSetup = async () => {
+    if (!twoFactorPhone || twoFactorPhone.length < 10) {
+      toast.error("Please enter a valid phone number");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/settings/two-factor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: twoFactorPhone, enable: true }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to enable 2FA");
+      }
+
+      setTwoFactorEnabled(true);
+      setShowTwoFactorSetup(false);
+      toast.success("Two-factor authentication enabled!");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDisableTwoFactor = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/settings/two-factor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enable: false }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to disable 2FA");
+      }
+
+      setTwoFactorEnabled(false);
+      toast.success("Two-factor authentication disabled!");
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An error occurred";
       toast.error(errorMessage);
@@ -245,19 +372,50 @@ export function SettingsPage({ user }: SettingsPageProps) {
                 <CardTitle>Two-Factor Authentication</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      SMS Authentication
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Receive a code via SMS to verify your identity
-                    </p>
+                {!showTwoFactorSetup ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        SMS Authentication
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {twoFactorEnabled
+                          ? "Two-factor authentication is enabled"
+                          : "Receive a code via SMS to verify your identity"}
+                      </p>
+                    </div>
+                    {twoFactorEnabled ? (
+                      <Button variant="outline" onClick={handleDisableTwoFactor} loading={loading}>
+                        Disable
+                      </Button>
+                    ) : (
+                      <Button variant="outline" onClick={() => setShowTwoFactorSetup(true)}>
+                        Enable
+                      </Button>
+                    )}
                   </div>
-                  <Button variant="outline" onClick={() => toast.info("2FA setup coming soon")}>
-                    Enable
-                  </Button>
-                </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-500">
+                      Enter your phone number to receive verification codes
+                    </p>
+                    <Input
+                      label="Phone Number"
+                      type="tel"
+                      placeholder="+1 (555) 000-0000"
+                      value={twoFactorPhone}
+                      onChange={(e) => setTwoFactorPhone(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setShowTwoFactorSetup(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleTwoFactorSetup} loading={loading}>
+                        Enable 2FA
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -290,40 +448,55 @@ export function SettingsPage({ user }: SettingsPageProps) {
               <CardTitle>Notification Preferences</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <NotificationToggle
+              <ToggleSetting
                 title="Email Notifications"
                 description="Receive email alerts for important events"
-                defaultChecked
+                checked={notifications.emailNotifications}
+                onChange={(checked) => setNotifications({ ...notifications, emailNotifications: checked })}
               />
-              <NotificationToggle
+              <ToggleSetting
                 title="Push Notifications"
                 description="Receive browser push notifications"
-                defaultChecked
+                checked={notifications.pushNotifications}
+                onChange={(checked) => setNotifications({ ...notifications, pushNotifications: checked })}
               />
-              <NotificationToggle
+              <ToggleSetting
                 title="Safety Alerts"
                 description="Get notified about safety events and incidents"
-                defaultChecked
+                checked={notifications.safetyAlerts}
+                onChange={(checked) => setNotifications({ ...notifications, safetyAlerts: checked })}
               />
-              <NotificationToggle
+              <ToggleSetting
                 title="ELD Violations"
                 description="Receive alerts when drivers exceed HOS limits"
-                defaultChecked
+                checked={notifications.eldViolations}
+                onChange={(checked) => setNotifications({ ...notifications, eldViolations: checked })}
               />
-              <NotificationToggle
+              <ToggleSetting
                 title="Geofence Alerts"
                 description="Get notified when vehicles enter or exit geofences"
-                defaultChecked
+                checked={notifications.geofenceAlerts}
+                onChange={(checked) => setNotifications({ ...notifications, geofenceAlerts: checked })}
               />
-              <NotificationToggle
+              <ToggleSetting
                 title="Maintenance Reminders"
                 description="Receive upcoming maintenance notifications"
+                checked={notifications.maintenanceReminders}
+                onChange={(checked) => setNotifications({ ...notifications, maintenanceReminders: checked })}
               />
-              <NotificationToggle
+              <ToggleSetting
                 title="Weekly Reports"
                 description="Receive weekly fleet performance summaries"
+                checked={notifications.weeklyReports}
+                onChange={(checked) => setNotifications({ ...notifications, weeklyReports: checked })}
               />
             </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button onClick={handleNotificationsSubmit} loading={loading}>
+                <Save className="w-4 h-4 mr-2" />
+                Save Preferences
+              </Button>
+            </CardFooter>
           </Card>
         )}
 
@@ -334,34 +507,22 @@ export function SettingsPage({ user }: SettingsPageProps) {
                 <CardTitle>Display Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      Dark Mode
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Switch between light and dark themes
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setDarkMode(!darkMode)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      darkMode ? "bg-blue-600" : "bg-gray-200"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        darkMode ? "translate-x-6" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </div>
+                <ToggleSetting
+                  title="Dark Mode"
+                  description="Switch between light and dark themes"
+                  checked={preferences.darkMode}
+                  onChange={(checked) => setPreferences({ ...preferences, darkMode: checked })}
+                />
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Distance Unit
                   </label>
-                  <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800">
+                  <select
+                    value={preferences.distanceUnit}
+                    onChange={(e) => setPreferences({ ...preferences, distanceUnit: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white"
+                  >
                     <option value="miles">Miles</option>
                     <option value="kilometers">Kilometers</option>
                   </select>
@@ -371,7 +532,11 @@ export function SettingsPage({ user }: SettingsPageProps) {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Timezone
                   </label>
-                  <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800">
+                  <select
+                    value={preferences.timezone}
+                    onChange={(e) => setPreferences({ ...preferences, timezone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white"
+                  >
                     <option value="America/Chicago">Central Time (CT)</option>
                     <option value="America/New_York">Eastern Time (ET)</option>
                     <option value="America/Denver">Mountain Time (MT)</option>
@@ -383,7 +548,11 @@ export function SettingsPage({ user }: SettingsPageProps) {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Date Format
                   </label>
-                  <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800">
+                  <select
+                    value={preferences.dateFormat}
+                    onChange={(e) => setPreferences({ ...preferences, dateFormat: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white"
+                  >
                     <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                     <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                     <option value="YYYY-MM-DD">YYYY-MM-DD</option>
@@ -401,41 +570,37 @@ export function SettingsPage({ user }: SettingsPageProps) {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Default Map View
                   </label>
-                  <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800">
+                  <select
+                    value={preferences.mapView}
+                    onChange={(e) => setPreferences({ ...preferences, mapView: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white"
+                  >
                     <option value="street">Street Map</option>
                     <option value="satellite">Satellite</option>
                     <option value="terrain">Terrain</option>
                   </select>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      Traffic Layer
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Show real-time traffic conditions
-                    </p>
-                  </div>
-                  <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-600">
-                    <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
-                  </button>
-                </div>
+                <ToggleSetting
+                  title="Traffic Layer"
+                  description="Show real-time traffic conditions"
+                  checked={preferences.trafficLayer}
+                  onChange={(checked) => setPreferences({ ...preferences, trafficLayer: checked })}
+                />
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      Auto-refresh
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Automatically update vehicle positions
-                    </p>
-                  </div>
-                  <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-600">
-                    <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
-                  </button>
-                </div>
+                <ToggleSetting
+                  title="Auto-refresh"
+                  description="Automatically update vehicle positions"
+                  checked={preferences.autoRefresh}
+                  onChange={(checked) => setPreferences({ ...preferences, autoRefresh: checked })}
+                />
               </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button onClick={handlePreferencesSubmit} loading={loading}>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Preferences
+                </Button>
+              </CardFooter>
             </Card>
           </div>
         )}
@@ -444,15 +609,14 @@ export function SettingsPage({ user }: SettingsPageProps) {
   );
 }
 
-interface NotificationToggleProps {
+interface ToggleSettingProps {
   title: string;
   description: string;
-  defaultChecked?: boolean;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
 }
 
-function NotificationToggle({ title, description, defaultChecked }: NotificationToggleProps) {
-  const [checked, setChecked] = useState(defaultChecked || false);
-
+function ToggleSetting({ title, description, checked, onChange }: ToggleSettingProps) {
   return (
     <div className="flex items-center justify-between">
       <div>
@@ -460,7 +624,7 @@ function NotificationToggle({ title, description, defaultChecked }: Notification
         <p className="text-sm text-gray-500">{description}</p>
       </div>
       <button
-        onClick={() => setChecked(!checked)}
+        onClick={() => onChange(!checked)}
         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
           checked ? "bg-blue-600" : "bg-gray-200"
         }`}

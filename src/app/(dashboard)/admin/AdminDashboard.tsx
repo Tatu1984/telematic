@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { AddUserModal } from "./AddUserModal";
 import { AddOrganizationModal } from "./AddOrganizationModal";
+import { EditOrganizationModal } from "./EditOrganizationModal";
+import { EditUserModal } from "./EditUserModal";
 
 interface Organization {
   id: string;
@@ -93,6 +95,8 @@ export function AdminDashboard({
   const [deletingOrg, setDeletingOrg] = useState<Organization | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
 
   const handleDeleteOrg = async () => {
     if (!deletingOrg) return;
@@ -358,7 +362,7 @@ export function AdminDashboard({
                           {
                             label: "Edit Organization",
                             icon: <Edit className="w-4 h-4" />,
-                            onClick: () => toast.info("Edit modal coming soon"),
+                            onClick: () => setEditingOrg(org),
                           },
                           {
                             label: "Delete Organization",
@@ -458,7 +462,7 @@ export function AdminDashboard({
                           {
                             label: "Edit User",
                             icon: <UserCog className="w-4 h-4" />,
-                            onClick: () => toast.info("Edit modal coming soon"),
+                            onClick: () => setEditingUser(user),
                           },
                           {
                             label: user.status === "active" ? "Deactivate User" : "Activate User",
@@ -520,6 +524,23 @@ export function AdminDashboard({
         confirmLabel="Delete"
         confirmVariant="danger"
         loading={deleteLoading}
+      />
+
+      {/* Edit Organization Modal */}
+      {isSaaSAdmin && (
+        <EditOrganizationModal
+          isOpen={!!editingOrg}
+          onClose={() => setEditingOrg(null)}
+          organization={editingOrg}
+        />
+      )}
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        isOpen={!!editingUser}
+        onClose={() => setEditingUser(null)}
+        user={editingUser}
+        isSaaSAdmin={isSaaSAdmin}
       />
     </div>
   );

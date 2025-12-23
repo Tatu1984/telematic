@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -47,6 +47,12 @@ model User {
   lastLogin       DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // User Settings
+  twoFactorEnabled      Boolean @default(false)
+  twoFactorPhone        String?
+  preferences           String?  // JSON string: { darkMode, distanceUnit, timezone, dateFormat, mapView, trafficLayer, autoRefresh }
+  notificationSettings  String?  // JSON string: { emailNotifications, pushNotifications, safetyAlerts, etc }
 
   organizationId  String?
   organization    Organization? @relation(fields: [organizationId], references: [id])
