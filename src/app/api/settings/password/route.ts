@@ -3,10 +3,22 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { compare, hash } from "bcryptjs";
+import { withRateLimit } from "@/lib/rateLimit";
+import { revokeAllUserTokens } from "@/lib/tokenRevocation";
+import { createLogger } from "@/lib/logger";
 
+const log = createLogger("password");
+
+// Strong password policy: min 12 chars, uppercase, lowercase, number, special char
 const passwordSchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(8),
+  newPassword: z
+    .string()
+    .min(12, "Password must be at least 12 characters")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character"),
 });
 
 export async function POST(request: Request) {
@@ -15,6 +27,10 @@ export async function POST(request: Request) {
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Apply strict rate limiting for password changes
+    const rateLimitResponse = await withRateLimit("sensitive")(request, session.user.id);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const body = await request.json();
     const validatedData = passwordSchema.parse(body);
@@ -32,6 +48,7 @@ export async function POST(request: Request) {
     // Verify current password
     const isValid = await compare(validatedData.currentPassword, user.password);
     if (!isValid) {
+      log.warn({ userId: session.user.id }, "Invalid current password attempt");
       return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
     }
 
@@ -44,7 +61,20 @@ export async function POST(request: Request) {
       data: { password: hashedPassword },
     });
 
-    return NextResponse.json({ success: true });
+    // Revoke all existing sessions for security
+    try {
+      await revokeAllUserTokens(session.user.id, "password_change");
+    } catch (revokeError) {
+      // Log but don't fail - password was changed successfully
+      log.error({ error: revokeError, userId: session.user.id }, "Failed to revoke tokens after password change");
+    }
+
+    log.info({ userId: session.user.id }, "Password changed successfully");
+
+    return NextResponse.json({
+      success: true,
+      message: "Password updated successfully. Please log in again.",
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -52,7 +82,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    console.error("Error updating password:", error);
+    log.error({ error }, "Error updating password");
     return NextResponse.json(
       { error: "Failed to update password" },
       { status: 500 }

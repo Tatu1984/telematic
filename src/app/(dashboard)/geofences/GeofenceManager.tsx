@@ -10,7 +10,6 @@ import {
   CardContent,
   Button,
   Badge,
-  Input,
   ConfirmDialog,
   toast,
 } from "@/components/ui";
@@ -18,7 +17,6 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import {
   MapPin,
   Plus,
-  Edit,
   Trash2,
   Bell,
   BellOff,
@@ -118,7 +116,6 @@ export function GeofenceManager({ geofences }: GeofenceManagerProps) {
   const activeGeofences = geofences.filter((g) => g.status === "active").length;
   const totalAlerts = geofences.reduce((sum, g) => sum + g._count.alerts, 0);
   const circleGeofences = geofences.filter((g) => g.type === "circle").length;
-  const polygonGeofences = geofences.filter((g) => g.type === "polygon").length;
 
   const parsedGeofences = geofences.map((g) => ({
     ...g,

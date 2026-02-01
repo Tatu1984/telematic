@@ -66,6 +66,12 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Only admins and fleet managers can update incidents
+    const allowedRoles = ["saas_admin", "company_admin", "fleet_manager"];
+    if (!allowedRoles.includes(session.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const validatedData = updateIncidentSchema.parse(body);

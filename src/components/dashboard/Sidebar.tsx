@@ -18,7 +18,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { signOut } from "next-auth/react";
 
 interface SidebarProps {
@@ -90,15 +90,16 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function Sidebar({ user }: SidebarProps) {
-  const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+// Extracted NavContent as a separate component to avoid re-creation on each render
+interface NavContentProps {
+  user: SessionUser;
+  filteredNavItems: NavItem[];
+  pathname: string;
+  onNavClick: () => void;
+}
 
-  const filteredNavItems = navItems.filter(
-    (item) => !item.roles || item.roles.includes(user.role)
-  );
-
-  const NavContent = () => (
+function NavContent({ user, filteredNavItems, pathname, onNavClick }: NavContentProps) {
+  return (
     <>
       <div className="flex items-center gap-3 px-4 py-6 border-b border-gray-200 dark:border-gray-700">
         <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
@@ -123,7 +124,7 @@ export function Sidebar({ user }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setMobileOpen(false)}
+              onClick={onNavClick}
               className={`
                 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
                 ${
@@ -167,6 +168,18 @@ export function Sidebar({ user }: SidebarProps) {
       </div>
     </>
   );
+}
+
+export function Sidebar({ user }: SidebarProps) {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const filteredNavItems = useMemo(
+    () => navItems.filter((item) => !item.roles || item.roles.includes(user.role)),
+    [user.role]
+  );
+
+  const handleNavClick = () => setMobileOpen(false);
 
   return (
     <>
@@ -200,13 +213,23 @@ export function Sidebar({ user }: SidebarProps) {
           <X className="w-6 h-6" />
         </button>
         <div className="flex flex-col h-full">
-          <NavContent />
+          <NavContent
+            user={user}
+            filteredNavItems={filteredNavItems}
+            pathname={pathname}
+            onNavClick={handleNavClick}
+          />
         </div>
       </aside>
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
-        <NavContent />
+        <NavContent
+          user={user}
+          filteredNavItems={filteredNavItems}
+          pathname={pathname}
+          onNavClick={handleNavClick}
+        />
       </aside>
     </>
   );

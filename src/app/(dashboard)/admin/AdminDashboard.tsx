@@ -4,9 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
   Button,
   Badge,
   Input,
@@ -24,8 +21,6 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import {
   Building2,
   Users,
-  Truck,
-  UserCheck,
   Plus,
   Search,
   Edit,
@@ -38,6 +33,8 @@ import { AddUserModal } from "./AddUserModal";
 import { AddOrganizationModal } from "./AddOrganizationModal";
 import { EditOrganizationModal } from "./EditOrganizationModal";
 import { EditUserModal } from "./EditUserModal";
+import { ViewOrganizationModal } from "./ViewOrganizationModal";
+import { ViewUserModal } from "./ViewUserModal";
 
 interface Organization {
   id: string;
@@ -97,6 +94,8 @@ export function AdminDashboard({
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [viewingOrg, setViewingOrg] = useState<Organization | null>(null);
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
 
   const handleDeleteOrg = async () => {
     if (!deletingOrg) return;
@@ -357,7 +356,7 @@ export function AdminDashboard({
                           {
                             label: "View Details",
                             icon: <Eye className="w-4 h-4" />,
-                            onClick: () => toast.info(`Viewing ${org.name}`),
+                            onClick: () => setViewingOrg(org),
                           },
                           {
                             label: "Edit Organization",
@@ -457,7 +456,7 @@ export function AdminDashboard({
                           {
                             label: "View Profile",
                             icon: <Eye className="w-4 h-4" />,
-                            onClick: () => toast.info(`Viewing ${user.firstName} ${user.lastName}`),
+                            onClick: () => setViewingUser(user),
                           },
                           {
                             label: "Edit User",
@@ -541,6 +540,30 @@ export function AdminDashboard({
         onClose={() => setEditingUser(null)}
         user={editingUser}
         isSaaSAdmin={isSaaSAdmin}
+      />
+
+      {/* View Organization Modal */}
+      {isSaaSAdmin && (
+        <ViewOrganizationModal
+          isOpen={!!viewingOrg}
+          onClose={() => setViewingOrg(null)}
+          organization={viewingOrg}
+          onEdit={() => {
+            setViewingOrg(null);
+            setEditingOrg(viewingOrg);
+          }}
+        />
+      )}
+
+      {/* View User Modal */}
+      <ViewUserModal
+        isOpen={!!viewingUser}
+        onClose={() => setViewingUser(null)}
+        user={viewingUser}
+        onEdit={() => {
+          setViewingUser(null);
+          setEditingUser(viewingUser);
+        }}
       />
     </div>
   );

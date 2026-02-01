@@ -105,7 +105,7 @@ export async function GET(request: Request) {
           alertOnEntry: g.alertOnEntry,
           alertOnExit: g.alertOnExit,
         };
-      } catch (parseError) {
+      } catch {
         log.warn({ geofenceId: g.id }, "Failed to parse geofence coordinates");
         return null;
       }

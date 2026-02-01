@@ -5,33 +5,72 @@ import { createLogger } from "./logger";
 const log = createLogger("rate-limiter");
 
 // Default rate limiter configuration
-const DEFAULT_POINTS = 100; // Number of requests
-const DEFAULT_DURATION = 60; // Per 60 seconds
+const DEFAULT_POINTS = 100;
 
-// Create different rate limiters for different use cases
-const rateLimiters = {
-  // General API rate limiter
-  api: new RateLimiterMemory({
+// Rate limiter types
+export type RateLimitType = "api" | "auth" | "sensitive";
+
+// Configuration for each rate limit type
+const rateLimitConfig: Record<RateLimitType, { points: number; duration: number }> = {
+  api: {
     points: parseInt(process.env.RATE_LIMIT_MAX || String(DEFAULT_POINTS)),
-    duration: Math.floor(
-      parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000") / 1000
-    ),
-  }),
-
-  // Stricter rate limiter for authentication endpoints
-  auth: new RateLimiterMemory({
+    duration: Math.floor(parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000") / 1000),
+  },
+  auth: {
     points: 10,
     duration: 60, // 10 requests per minute
-  }),
-
-  // Very strict rate limiter for sensitive operations
-  sensitive: new RateLimiterMemory({
+  },
+  sensitive: {
     points: 5,
     duration: 60, // 5 requests per minute
-  }),
+  },
 };
 
-export type RateLimitType = keyof typeof rateLimiters;
+// In-memory rate limiters (fallback for development or when Redis is not configured)
+const memoryLimiters: Record<RateLimitType, RateLimiterMemory> = {
+  api: new RateLimiterMemory(rateLimitConfig.api),
+  auth: new RateLimiterMemory(rateLimitConfig.auth),
+  sensitive: new RateLimiterMemory(rateLimitConfig.sensitive),
+};
+
+// Upstash Rate limiter instance cache
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let upstashRatelimitInstance: any = null;
+
+async function getUpstashRatelimit(type: RateLimitType) {
+  // Only use Upstash if UPSTASH_REDIS_REST_URL is configured
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return null;
+  }
+
+  if (!upstashRatelimitInstance) {
+    try {
+      const { Ratelimit } = await import("@upstash/ratelimit");
+      const { Redis } = await import("@upstash/redis");
+
+      const redis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      });
+
+      // Create rate limiter with sliding window algorithm
+      upstashRatelimitInstance = new Ratelimit({
+        redis: redis,
+        limiter: Ratelimit.slidingWindow(
+          rateLimitConfig[type].points,
+          `${rateLimitConfig[type].duration}s`
+        ),
+        analytics: true,
+        prefix: `fleettrack:ratelimit:${type}`,
+      });
+    } catch (error) {
+      log.warn({ error }, "Failed to initialize Upstash Redis, falling back to memory");
+      return null;
+    }
+  }
+
+  return upstashRatelimitInstance;
+}
 
 // Get client identifier (IP address or user ID)
 export function getClientIdentifier(
@@ -45,7 +84,8 @@ export function getClientIdentifier(
 
   // Otherwise, use IP address
   const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded?.split(",")[0]?.trim() || "anonymous";
+  const realIp = request.headers.get("x-real-ip");
+  const ip = forwarded?.split(",")[0]?.trim() || realIp || "anonymous";
   return `ip:${ip}`;
 }
 
@@ -57,12 +97,39 @@ export interface RateLimitResult {
   retryAfter?: number;
 }
 
-// Check rate limit
+// Check rate limit using Upstash (production) or memory (development)
 export async function checkRateLimit(
   identifier: string,
   type: RateLimitType = "api"
 ): Promise<RateLimitResult> {
-  const limiter = rateLimiters[type];
+  // Try Upstash first (production)
+  const upstash = await getUpstashRatelimit(type);
+
+  if (upstash) {
+    try {
+      const result = await upstash.limit(identifier);
+
+      if (!result.success) {
+        log.warn(
+          { identifier, type, remaining: result.remaining },
+          "Rate limit exceeded (Upstash)"
+        );
+      }
+
+      return {
+        success: result.success,
+        remaining: result.remaining,
+        resetTime: result.reset,
+        retryAfter: result.success ? undefined : Math.ceil((result.reset - Date.now()) / 1000),
+      };
+    } catch (error) {
+      log.error({ error }, "Upstash rate limit check failed, falling back to memory");
+      // Fall through to memory limiter
+    }
+  }
+
+  // Fallback to memory limiter (development or Redis failure)
+  const limiter = memoryLimiters[type];
 
   try {
     const result = await limiter.consume(identifier);
@@ -76,7 +143,7 @@ export async function checkRateLimit(
       const rateLimitError = error as { msBeforeNext: number };
       log.warn(
         { identifier, type, retryAfter: rateLimitError.msBeforeNext },
-        "Rate limit exceeded"
+        "Rate limit exceeded (memory)"
       );
       return {
         success: false,
@@ -118,9 +185,7 @@ export function rateLimitExceededResponse(
 }
 
 // Higher-order function to wrap API handlers with rate limiting
-export function withRateLimit(
-  type: RateLimitType = "api"
-) {
+export function withRateLimit(type: RateLimitType = "api") {
   return async function rateLimit(
     request: Request,
     userId?: string
@@ -136,4 +201,4 @@ export function withRateLimit(
   };
 }
 
-export default rateLimiters;
+export default memoryLimiters;

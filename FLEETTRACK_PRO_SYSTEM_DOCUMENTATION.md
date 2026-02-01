@@ -208,16 +208,16 @@ All modules have been implemented, tested, and verified working.
 
 ## Demo Credentials
 
-| Role | Email | Password |
-|------|-------|----------|
-| SaaS Admin | admin@fleettrack.com | admin123 |
-| Company Admin | admin@acmetrucking.com | company123 |
-| Fleet Manager | fleet@acmetrucking.com | fleet123 |
-| Driver | john.smith@acmetrucking.com | driver123 |
-| Driver | emily.davis@acmetrucking.com | driver123 |
-| Driver | robert.brown@acmetrucking.com | driver123 |
-| Driver | maria.garcia@acmetrucking.com | driver123 |
-| Driver | james.wilson@acmetrucking.com | driver123 |
+All demo accounts use the same password: `FleetTrack2024!`
+
+| Role | Email |
+|------|-------|
+| SaaS Admin | admin@fleettrack.com |
+| Company Admin | admin@acmetrucking.com |
+| Fleet Manager | fleet@acmetrucking.com |
+| Driver | driver@acmetrucking.com |
+
+> **Note:** Password can be customized via `DEMO_PASSWORD` environment variable during seeding.
 
 ---
 
@@ -305,12 +305,17 @@ NEXTAUTH_URL="https://your-domain.com"
 ## Security Features
 
 - Password hashing with bcryptjs (12 rounds)
+- Strong password policy (12+ chars, upper/lower/number/special)
 - JWT session tokens (24-hour expiry)
-- Role-based route protection
-- Organization-level data isolation
-- Input validation with Zod
+- Role-based route protection with privilege escalation prevention
+- Organization-level data isolation (multi-tenant security)
+- Rate limiting on all sensitive endpoints (auth, password, admin)
+- Input validation with Zod on all API endpoints
 - SQL injection prevention (Prisma ORM)
 - CSRF protection (NextAuth)
+- Database transactions for atomic operations
+- Optimized database indexes for performance
+- 2FA placeholder ready for identity provider integration (e.g., Entra ID)
 
 ---
 

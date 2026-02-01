@@ -10,7 +10,6 @@ import {
   Button,
   Badge,
   Input,
-  Select,
   toast,
 } from "@/components/ui";
 import { StatsCard } from "@/components/dashboard/StatsCard";
@@ -23,11 +22,8 @@ import {
   Truck,
   User,
   Video,
-  Clock,
-  CheckCircle,
   AlertCircle,
   FileText,
-  Filter,
 } from "lucide-react";
 import { ReportIncidentModal } from "./ReportIncidentModal";
 
@@ -66,7 +62,7 @@ interface IncidentsListProps {
   userRole: string;
 }
 
-export function IncidentsList({ incidents, userRole }: IncidentsListProps) {
+export function IncidentsList({ incidents }: IncidentsListProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");

@@ -93,7 +93,7 @@ export function safeJsonParse<T>(
 ): T {
   try {
     return JSON.parse(json) as T;
-  } catch (error) {
+  } catch {
     if (log) {
       log.warn({ json: json.substring(0, 100) }, "Failed to parse JSON");
     }

@@ -425,17 +425,25 @@ export function SettingsPage({ user }: SettingsPageProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        Current Session
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Chrome on macOS - Active now
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          Current Session
+                        </p>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {user.email} - Active now
                       </p>
                     </div>
-                    <span className="text-xs text-green-600">Active</span>
+                    <span className="text-xs font-medium text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
+                      Active
+                    </span>
                   </div>
+                  <p className="text-xs text-gray-500">
+                    Session management with device tracking will be available when an identity provider (e.g., Entra ID) is configured.
+                  </p>
                 </div>
               </CardContent>
             </Card>

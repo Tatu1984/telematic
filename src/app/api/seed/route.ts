@@ -3,11 +3,19 @@ import { prisma } from "@/lib/db";
 import { hash } from "bcryptjs";
 import { auth } from "@/lib/auth";
 import { createLogger, logError } from "@/lib/logger";
+import { getClientIdentifier, checkRateLimit, rateLimitExceededResponse } from "@/lib/rateLimit";
 
 const log = createLogger("seed");
 
 export async function POST(request: Request) {
   try {
+    // Apply very strict rate limiting for seed endpoint (1 per minute)
+    const identifier = getClientIdentifier(request);
+    const rateLimitResult = await checkRateLimit(identifier, "sensitive");
+    if (!rateLimitResult.success) {
+      return rateLimitExceededResponse(rateLimitResult);
+    }
+
     // In production, require admin authentication
     if (process.env.NODE_ENV === "production") {
       const session = await auth();
@@ -56,12 +64,15 @@ export async function POST(request: Request) {
       },
     });
 
-    // Create SaaS Admin
-    const adminPassword = await hash("admin123", 12);
+    // Use environment variable for demo password or secure default
+    const demoPassword = process.env.DEMO_PASSWORD || "FleetTrack2024!";
+    const hashedDemoPassword = await hash(demoPassword, 12);
+
+    // Create SaaS Admin (one demo credential)
     await prisma.user.create({
       data: {
         email: "admin@fleettrack.com",
-        password: adminPassword,
+        password: hashedDemoPassword,
         firstName: "System",
         lastName: "Admin",
         role: "saas_admin",
@@ -69,12 +80,11 @@ export async function POST(request: Request) {
       },
     });
 
-    // Create Company Admin
-    const companyAdminPassword = await hash("company123", 12);
+    // Create Company Admin (one demo credential)
     await prisma.user.create({
       data: {
         email: "admin@acmetrucking.com",
-        password: companyAdminPassword,
+        password: hashedDemoPassword,
         firstName: "Mike",
         lastName: "Johnson",
         role: "company_admin",
@@ -83,12 +93,11 @@ export async function POST(request: Request) {
       },
     });
 
-    // Create Fleet Manager
-    const fleetManagerPassword = await hash("fleet123", 12);
+    // Create Fleet Manager (one demo credential)
     await prisma.user.create({
       data: {
         email: "fleet@acmetrucking.com",
-        password: fleetManagerPassword,
+        password: hashedDemoPassword,
         firstName: "Sarah",
         lastName: "Williams",
         role: "fleet_manager",
@@ -97,14 +106,12 @@ export async function POST(request: Request) {
       },
     });
 
-    // Create drivers
-    const driverPassword = await hash("driver123", 12);
+    // Create drivers - one primary demo driver and additional drivers for realistic fleet data
+    // Only driver@acmetrucking.com is documented as demo credential
     const driversData = [
-      { firstName: "John", lastName: "Smith", email: "john.smith@acmetrucking.com", license: "CDL-A123456", state: "IL" },
+      { firstName: "John", lastName: "Smith", email: "driver@acmetrucking.com", license: "CDL-A123456", state: "IL" },
       { firstName: "Emily", lastName: "Davis", email: "emily.davis@acmetrucking.com", license: "CDL-B789012", state: "IL" },
       { firstName: "Robert", lastName: "Brown", email: "robert.brown@acmetrucking.com", license: "CDL-C345678", state: "IN" },
-      { firstName: "Maria", lastName: "Garcia", email: "maria.garcia@acmetrucking.com", license: "CDL-D901234", state: "WI" },
-      { firstName: "James", lastName: "Wilson", email: "james.wilson@acmetrucking.com", license: "CDL-E567890", state: "MI" },
     ];
 
     const drivers = [];
@@ -112,7 +119,7 @@ export async function POST(request: Request) {
       const user = await prisma.user.create({
         data: {
           email: driverData.email,
-          password: driverPassword,
+          password: hashedDemoPassword,
           firstName: driverData.firstName,
           lastName: driverData.lastName,
           role: "driver",

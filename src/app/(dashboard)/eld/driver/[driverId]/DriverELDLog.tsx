@@ -21,7 +21,6 @@ import {
   ArrowLeft,
   Clock,
   Truck,
-  Calendar,
   Coffee,
   Moon,
   Navigation,
@@ -185,6 +184,49 @@ export function DriverELDLog({ driver, eldLogs, weeklyLogs, selectedDate }: Driv
   const isCertified = eldLogs.every((log) => log.certified);
   const hasEdits = eldLogs.some((log) => log.edited);
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExport = () => {
+    // Generate CSV content
+    const headers = ["Date", "Status", "Start Time", "End Time", "Duration", "Location", "Certified"];
+    const rows = eldLogs.map((log) => [
+      new Date(log.date).toLocaleDateString(),
+      statusLabels[log.status as keyof typeof statusLabels] || log.status,
+      formatTime(log.startTime),
+      log.endTime ? formatTime(log.endTime) : "N/A",
+      formatDuration(log.duration),
+      log.location || "N/A",
+      log.certified ? "Yes" : "No",
+    ]);
+
+    const csvContent = [
+      // Header info
+      `Driver: ${driver.user.firstName} ${driver.user.lastName}`,
+      `License: ${driver.licenseNumber} (${driver.licenseState})`,
+      `Date: ${currentDate}`,
+      `Organization: ${driver.organization?.name || "N/A"}`,
+      "",
+      headers.join(","),
+      ...rows.map((row) => row.join(",")),
+      "",
+      "HOS Summary",
+      `Driving: ${formatDuration(dailyHOS.drivingMinutes)}`,
+      `On Duty: ${formatDuration(dailyHOS.onDutyMinutes)}`,
+      `Off Duty: ${formatDuration(dailyHOS.offDutyMinutes)}`,
+      `Sleeper: ${formatDuration(dailyHOS.sleeperMinutes)}`,
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `ELD_Log_${driver.user.lastName}_${currentDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success("ELD log exported successfully!");
+  };
+
   const statusIcons = {
     off_duty: Coffee,
     sleeper_berth: Moon,
@@ -231,10 +273,10 @@ export function DriverELDLog({ driver, eldLogs, weeklyLogs, selectedDate }: Driv
             onChange={(e) => handleDateChange(e.target.value)}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
           />
-          <Button variant="outline" size="sm" onClick={() => toast.info("Print feature coming soon")}>
+          <Button variant="outline" size="sm" onClick={handlePrint} title="Print ELD Log">
             <Printer className="w-4 h-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => toast.info("Export feature coming soon")}>
+          <Button variant="outline" size="sm" onClick={handleExport} title="Export to CSV">
             <Download className="w-4 h-4" />
           </Button>
         </div>

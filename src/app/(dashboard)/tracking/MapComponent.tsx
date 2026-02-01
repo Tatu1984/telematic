@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import "leaflet/dist/leaflet.css";
 
-// Dynamic import Leaflet to avoid SSR issues
-let L: typeof import("leaflet") | null = null;
-if (typeof window !== "undefined") {
-  L = require("leaflet");
-}
+// Dynamic import Leaflet to avoid SSR issues - using dynamic import pattern
+const getLeaflet = () => {
+  if (typeof window !== "undefined") {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("leaflet") as typeof import("leaflet");
+  }
+  return null;
+};
 
 interface VehicleMarker {
   id: string;
@@ -45,11 +48,17 @@ export default function MapComponent({
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   const geofencesRef = useRef<L.Layer[]>([]);
-  const [isMapReady, setIsMapReady] = useState(false);
+  const leafletRef = useRef<typeof import("leaflet") | null>(null);
 
+  // Initialize map
   useEffect(() => {
     // Only initialize on client side
-    if (typeof window === "undefined" || !L || !mapContainerRef.current) return;
+    if (typeof window === "undefined" || !mapContainerRef.current) return;
+
+    const L = getLeaflet();
+    if (!L) return;
+
+    leafletRef.current = L;
 
     // Initialize map only if not already initialized
     if (!mapRef.current) {
@@ -63,22 +72,20 @@ export default function MapComponent({
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(mapRef.current);
-
-      setIsMapReady(true);
     }
 
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
-        setIsMapReady(false);
       }
     };
   }, []);
 
   // Update vehicle markers
   useEffect(() => {
-    if (!mapRef.current || !L || !isMapReady) return;
+    const L = leafletRef.current;
+    if (!mapRef.current || !L) return;
 
     // Remove old markers
     markersRef.current.forEach((marker) => {
@@ -159,7 +166,8 @@ export default function MapComponent({
 
   // Update geofences
   useEffect(() => {
-    if (!mapRef.current || !L || !isMapReady) return;
+    const L = leafletRef.current;
+    if (!mapRef.current || !L) return;
 
     // Remove old geofences
     geofencesRef.current.forEach((layer) => {
@@ -198,11 +206,11 @@ export default function MapComponent({
       layer.addTo(mapRef.current!);
       geofencesRef.current.push(layer);
     });
-  }, [geofences, isMapReady]);
+  }, [geofences]);
 
   // Focus on selected vehicle
   useEffect(() => {
-    if (!mapRef.current || !selectedVehicle || !isMapReady) return;
+    if (!mapRef.current || !selectedVehicle) return;
 
     const vehicle = vehicles.find((v) => v.id === selectedVehicle);
     if (vehicle) {
@@ -212,7 +220,7 @@ export default function MapComponent({
         marker.openPopup();
       }
     }
-  }, [selectedVehicle, vehicles, isMapReady]);
+  }, [selectedVehicle, vehicles]);
 
   return (
     <>

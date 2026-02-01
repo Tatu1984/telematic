@@ -50,6 +50,7 @@ model User {
 
   // User Settings
   twoFactorEnabled      Boolean @default(false)
+  twoFactorSecret       String?  // TOTP secret for 2FA
   twoFactorPhone        String?
   preferences           String?  // JSON string: { darkMode, distanceUnit, timezone, dateFormat, mapView, trafficLayer, autoRefresh }
   notificationSettings  String?  // JSON string: { emailNotifications, pushNotifications, safetyAlerts, etc }
@@ -60,6 +61,11 @@ model User {
   driver          Driver?
   sessions        Session[]
   auditLogs       AuditLog[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([organizationId])
+  @@index([role])
+  @@index([status])
 }
 
 model Session {
@@ -68,6 +74,34 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Password reset tokens
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+// Token blacklist for session revocation
+model RevokedToken {
+  id        String   @id @default(cuid())
+  jti       String   @unique // JWT ID or token hash
+  userId    String
+  reason    String?  // logout, password_change, admin_revoke, security
+  revokedAt DateTime @default(now())
+  expiresAt DateTime // When the original token would have expired
+
+  @@index([jti])
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ==================== DRIVER MANAGEMENT ====================
@@ -99,6 +133,10 @@ model Driver {
   incidents         Incident[]
   safetyEvents      SafetyEvent[]
   assignments       VehicleAssignment[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([licenseExpiry])
 }
 
 // ==================== VEHICLE MANAGEMENT ====================
@@ -135,6 +173,10 @@ model Vehicle {
   incidents         Incident[]
   videos            Video[]
   assignments       VehicleAssignment[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([nextServiceDue])
 }
 
 model VehicleAssignment {
@@ -293,6 +335,10 @@ model Trip {
 
   routeId         String?
   route           Route?   @relation(fields: [routeId], references: [id])
+
+  @@index([vehicleId, startTime])
+  @@index([driverId, startTime])
+  @@index([status])
 }
 
 // ==================== GEOFENCING ====================
@@ -314,6 +360,9 @@ model Geofence {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   alerts         Alert[]
+
+  @@index([organizationId])
+  @@index([status])
 }
 
 // ==================== SAFETY & INCIDENTS ====================
@@ -362,6 +411,10 @@ model Incident {
   driver        Driver?  @relation(fields: [driverId], references: [id])
 
   videos        Video[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+  @@index([severity])
 }
 
 // ==================== VIDEO MANAGEMENT ====================
@@ -448,6 +501,9 @@ model Alert {
 
   geofenceId    String?
   geofence      Geofence? @relation(fields: [geofenceId], references: [id])
+
+  @@index([organizationId, read, createdAt])
+  @@index([organizationId, acknowledged])
 }
 
 // ==================== AUDIT LOG ====================
@@ -464,4 +520,7 @@ model AuditLog {
 
   userId      String
   user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, timestamp])
+  @@index([entity, entityId])
 }

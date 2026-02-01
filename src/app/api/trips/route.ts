@@ -114,26 +114,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const trip = await prisma.trip.create({
-      data: {
-        ...validatedData,
-        startTime: new Date(),
-        status: "in_progress",
-      },
-      include: {
-        vehicle: true,
-        driver: {
-          include: {
-            user: true,
+    // Create trip and update driver status in a transaction
+    const trip = await prisma.$transaction(async (tx) => {
+      // Create the trip
+      const newTrip = await tx.trip.create({
+        data: {
+          ...validatedData,
+          startTime: new Date(),
+          status: "in_progress",
+        },
+        include: {
+          vehicle: true,
+          driver: {
+            include: {
+              user: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Update driver status
-    await prisma.driver.update({
-      where: { id: validatedData.driverId },
-      data: { status: "driving" },
+      // Update driver status
+      await tx.driver.update({
+        where: { id: validatedData.driverId },
+        data: { status: "driving" },
+      });
+
+      return newTrip;
     });
 
     return NextResponse.json(trip, { status: 201 });

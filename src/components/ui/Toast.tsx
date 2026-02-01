@@ -11,17 +11,17 @@ interface Toast {
   type: ToastType;
 }
 
-interface ToastContextValue {
-  toasts: Toast[];
-  addToast: (message: string, type: ToastType) => void;
-  removeToast: (id: string) => void;
-}
-
 let toastListeners: ((toasts: Toast[]) => void)[] = [];
 let toasts: Toast[] = [];
 
 const notifyListeners = () => {
   toastListeners.forEach((listener) => listener([...toasts]));
+};
+
+// Module-level removeToast function to avoid reassignment in render
+const removeToastById = (id: string) => {
+  toasts = toasts.filter((t) => t.id !== id);
+  notifyListeners();
 };
 
 export const toast = {
@@ -95,11 +95,6 @@ export function ToastContainer() {
     };
   }, []);
 
-  const removeToast = (id: string) => {
-    toasts = toasts.filter((t) => t.id !== id);
-    notifyListeners();
-  };
-
   if (currentToasts.length === 0) return null;
 
   return (
@@ -114,7 +109,7 @@ export function ToastContainer() {
             <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconColors[t.type]}`} />
             <p className="flex-1 text-sm font-medium">{t.message}</p>
             <button
-              onClick={() => removeToast(t.id)}
+              onClick={() => removeToastById(t.id)}
               className="flex-shrink-0 hover:opacity-70 transition-opacity"
             >
               <X className="w-4 h-4" />

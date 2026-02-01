@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { withRateLimit } from "@/lib/rateLimit";
 
 const certifySchema = z.object({
   driverId: z.string(),
@@ -15,8 +16,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Only drivers can certify their own logs, admins/managers can certify for others
+    const allowedRoles = ["saas_admin", "company_admin", "fleet_manager", "driver"];
+    if (!allowedRoles.includes(session.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Apply rate limiting for this sensitive operation
+    const rateLimitResponse = await withRateLimit("sensitive")(request, session.user.id);
+    if (rateLimitResponse) return rateLimitResponse;
+
     const body = await request.json();
     const validatedData = certifySchema.parse(body);
+
+    // Verify the driver exists and belongs to the same organization
+    const driver = await prisma.driver.findUnique({
+      where: { id: validatedData.driverId },
+      include: { user: true },
+    });
+
+    if (!driver) {
+      return NextResponse.json({ error: "Driver not found" }, { status: 404 });
+    }
+
+    // Organization check: user can only certify logs for drivers in their org
+    if (session.user.organizationId && driver.organizationId !== session.user.organizationId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Drivers can only certify their own logs
+    if (session.user.role === "driver" && driver.userId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Drivers can only certify their own logs" },
+        { status: 403 }
+      );
+    }
 
     const selectedDate = new Date(validatedData.date);
     selectedDate.setHours(0, 0, 0, 0);

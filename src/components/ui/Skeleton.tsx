@@ -83,17 +83,20 @@ export const TableSkeleton = memo(function TableSkeleton({ rows = 5 }: { rows?: 
 });
 
 // Chart skeleton for analytics
+// Pre-computed heights for deterministic rendering
+const chartBarHeights = [65, 80, 45, 70, 55, 90, 60, 75, 50, 85, 40, 95];
+
 export const ChartSkeleton = memo(function ChartSkeleton() {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 animate-pulse">
       <Skeleton variant="text" width={150} height={24} animation="none" className="mb-4" />
       <div className="h-64 flex items-end gap-2">
-        {Array.from({ length: 12 }).map((_, i) => (
+        {chartBarHeights.map((height, i) => (
           <Skeleton
             key={i}
             variant="rectangular"
             width="100%"
-            height={`${Math.random() * 60 + 40}%`}
+            height={`${height}%`}
             animation="none"
             className="flex-1"
           />

@@ -13,10 +13,8 @@ import {
 import {
   Search,
   Truck,
-  MapPin,
   Navigation,
   Gauge,
-  Signal,
   User,
   RefreshCw,
 } from "lucide-react";
