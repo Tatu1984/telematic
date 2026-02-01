@@ -1,0 +1,28 @@
+/* Dark theme */
+[data-theme="dark"],
+.dark {
+  --background: var(--color-gray-950);
+  --foreground: var(--color-gray-50);
+
+  --card-background: var(--color-gray-900);
+  --card-foreground: var(--color-gray-50);
+  --card-border: var(--color-gray-800);
+
+  --sidebar-background: var(--color-gray-900);
+  --sidebar-foreground: var(--color-gray-50);
+  --sidebar-border: var(--color-gray-800);
+  --sidebar-hover: var(--color-gray-800);
+
+  --input-background: var(--color-gray-900);
+  --input-border: var(--color-gray-700);
+  --input-focus: var(--color-primary-500);
+
+  --button-primary: var(--color-primary-600);
+  --button-primary-hover: var(--color-primary-500);
+  --button-secondary: var(--color-gray-800);
+  --button-secondary-hover: var(--color-gray-700);
+
+  --text-primary: var(--color-gray-50);
+  --text-secondary: var(--color-gray-400);
+  --text-muted: var(--color-gray-500);
+}
