@@ -1500,7 +1500,7 @@ Target Users:
     footer_run.font.size = Pt(10)
 
     # Save document
-    doc_path = os.path.join(OUTPUT_DIR, 'FleetTrack_Pro_Statement_of_Work.docx')
+    doc_path = os.path.join(OUTPUT_DIR, 'SoW.docx')
     doc.save(doc_path)
     print(f"Created: {doc_path}")
     return doc_path
@@ -1525,7 +1525,7 @@ def main():
     print(f"\nFiles created in: {OUTPUT_DIR}")
     print("  - data_flow_diagram.png")
     print("  - architecture_diagram.png")
-    print("  - FleetTrack_Pro_Statement_of_Work.docx")
+    print("  - SoW.docx")
 
 if __name__ == "__main__":
     main()
